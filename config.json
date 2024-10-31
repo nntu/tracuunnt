@@ -1,0 +1,17 @@
+{
+  "headless": "False",
+  "use_proxy": "False",
+  "proxy_username": " ",
+  "proxy_password":" ",
+  "proxy_address":" ",
+  "proxy_port":"8080",
+  "page_margin":{
+    "top":20,
+    "bottom":20,
+    "left":30,
+    "right":15
+  },
+  "image_scale_factor":0.8
+  
+
+}
