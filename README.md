@@ -1,0 +1,1 @@
+# phần mem auto load thong tin 
