@@ -169,7 +169,8 @@ class CaptchaPredictor:
             text = tf.strings.reduce_join(self.num_to_char(res)).numpy().decode("utf-8")
             output_text.append(text)
         return output_text
-
+    
+   
     def predict(self, image_path, max_length=5):
         """Predict text from a single image"""
         processed_img = self.preprocess_image(image_path)
@@ -205,9 +206,3 @@ class CaptchaPredictor:
         plt.tight_layout()
         plt.show()
 
-# Initialize the predictor
-predictor = CaptchaPredictor('captcha.keras')
-
-# Single image prediction
-text = predictor.predict('test.jpg')
-print(f"Predicted text: {text}")

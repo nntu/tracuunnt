@@ -2,9 +2,11 @@ import logging
 from pathlib import Path
 from datetime import date
 
-def setup_logging(data_dir: Path, level: int = logging.INFO) -> None:
+def setup_logging(log_dir: Path, level: int = logging.INFO) -> None:
     """Configure logging for the application."""
-    log_file = data_dir / f'log_{date.today().strftime("%Y_%m_%d")}.log'
+    log_dir = Path(log_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / f'log_{date.today().strftime("%Y_%m_%d")}.log'
     
     logging.basicConfig(
         filename=str(log_file),

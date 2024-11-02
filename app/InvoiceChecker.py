@@ -1,9 +1,11 @@
 # -*- coding: utf8 -*-
+import io
 import json
 import logging
 import os
 from datetime import datetime, date
 from pathlib import Path
+from Screenshot import Screenshot
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -23,6 +25,7 @@ from PIL import Image
 import urllib
 
 from app.utils.downloadCaptcha import downloadCaptcha
+from check_re import CaptchaPredictor
 class InvoiceChecker:
     """Optimized system for checking and processing invoices."""
     
@@ -33,7 +36,7 @@ class InvoiceChecker:
         self.wait_timeout = 20
         self.max_retries = 3
         self.browser = None
-        
+        self.predictor = CaptchaPredictor('captcha.keras')
         # Configure logging
         self._setup_logging()
     
@@ -190,16 +193,22 @@ class InvoiceChecker:
             
             # Handle captcha and get result
             self._handle_captcha()
-            time.sleep(5)
             
+            time.sleep(2)
+            
+             
+             
             result = self._wait_for_result()
+             
             
+            
+            
+            time.sleep(5)
             # Take screenshot
-            screenshot_path = self._take_screenshot(row)
+            screenshot_path = self._take_screenshot(mst)
             
             return {
-                'result': result,
-                'analysis': self._parse_invoice_data(result),
+                'result': result,                
                 'screenshot': screenshot_path
             }
             
@@ -229,69 +238,97 @@ class InvoiceChecker:
         captcha_xpath = '//*[@id="tcmst"]/form/table/tbody/tr[6]/td[2]/table/tbody/tr/td[2]/div/img'
         capcha_dir = Path(self.path) / "captcha"
         capcha_dir.mkdir(parents=True, exist_ok=True)
-        for attempt in range(self.max_retries):
+        # Initialize the predictor
+        
+
+        # Single image prediction
+        
+        attempt = 0
+        while True:
             try:
                 img_element = WebDriverWait(self.browser, self.wait_timeout).until(
                     EC.presence_of_element_located((By.XPATH, captcha_xpath))
                 )
+                capfile = str(capcha_dir / f"captcha_{attempt}.png")
+                image_binary= img_element.screenshot_as_png
                 
-                img_file = img_element.get_attribute("src") 
-                
-                logging.info(img_file)
-                capfile =  downloadCaptcha(capcha_dir,img_file)
+                img = Image.open(io.BytesIO(image_binary))
+                img.save(capfile)
+                 
                 logging.info(capfile)
-    
+                solved_captcha = self.predictor.predict(capfile)
+                print(f"Predicted text: {solved_captcha}")
                 
-                # solved_captcha = solve_captcha(base64.b64decode(base64_svg))
                 
-                # captcha_input = WebDriverWait(self.browser, self.wait_timeout).until(
-                #     EC.presence_of_element_located((By.ID, 'captcha'))
-                # )
-                # captcha_input.clear()
-                # captcha_input.send_keys(solved_captcha)
-                # captcha_input.send_keys(Keys.RETURN)
-                return
+                
+                captcha_input = WebDriverWait(self.browser, self.wait_timeout).until(
+                    EC.presence_of_element_located((By.ID, 'captcha'))
+                )
+                captcha_input.clear()
+                captcha_input.send_keys(solved_captcha)
+               
+                result_element = WebDriverWait(self.browser, self.wait_timeout).until(
+                    EC.presence_of_element_located((By.CLASS_NAME, "subBtn"))
+                )
+                result_element.click()
+                
+                try:
+                    xpath_fa = """/html/body/div/div[1]/div[4]/div[2]/div[2]/div/div/div/p"""
+                    result_element = WebDriverWait(self.browser, 5).until(
+                        EC.presence_of_element_located((By.XPATH, xpath_fa))
+                    )
+                    logging.info(result_element.text)
+                    if result_element.text == "Vui lòng nhập đúng mã xác nhận!":
+                        attempt += 1
+                        capcha_diff = capcha_dir / "capcha_diff" 
+                        capcha_diff.mkdir(parents=True, exist_ok=True)     
+                        
+                        os.replace(capfile,capcha_diff / f"captcha_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")                              
+                        continue
+                    else:
+                        return False
+                except TimeoutException as e:
+                    logging.info("solve captcha")
+                    break
+            
+                
             except Exception as e:
-                if attempt == self.max_retries - 1:
+                logging.info({str(e)})
+                if attempt == 100:
                     raise Exception(f"Failed to solve captcha: {str(e)}")
     
-    def _wait_for_result(self) -> str:
+    
+    
+    
+    def _wait_for_result(self) -> pd.DataFrame:
         """Wait for and return the result text."""
         try:
-            result_xpath = '//*[@id="__next"]/section/main/section/div/div/div/div/div[3]/div[1]/div[2]/div[2]/section'
-            result_element = WebDriverWait(self.browser, self.wait_timeout).until(
-                EC.presence_of_element_located((By.XPATH, result_xpath))
+            
+            result_element = WebDriverWait(self.browser, 5).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "ta_border"))
             )
-            return result_element.text
+            res =  result_element.get_attribute("outerHTML")
+            if "<table class" in res:
+                df= pd.read_html(io.StringIO(str(res)))
+                #remove last rows
+                df = df[0].iloc[:-1, :]
+                 
+                return df
+        
+        
+        
         except TimeoutException:
             raise Exception("Timeout waiting for result")
     
-    def _take_screenshot(self, row: pd.Series) -> str:
+    def _take_screenshot(self, mst) -> str:
         """Take and save screenshot."""
-        screenshot_path = Path(self.data_dir) / f"{row['Mã số thuế NCC']}_{row['Số hóa đơn']}_{datetime.now().strftime('%d%m%Y')}.png"
-        self.browser.save_screenshot(str(screenshot_path))
-        return str(screenshot_path)
+        ob = Screenshot.Screenshot()
+       # screenshot_path = Path(self.data_dir) / f"{mst}_{datetime.now().strftime('%d%m%Y')}.png"
+        img_url = ob.full_screenshot(self.browser, save_path=self.data_dir, image_name=f"{mst}_{datetime.now().strftime('%d%m%Y')}.png", is_load_at_runtime=True,
+                                          load_wait_time=3)
+        return str(img_url)
     
-    @staticmethod
-    def _parse_invoice_data(text: str) -> Dict:
-        """Parse invoice result text into structured data."""
-        if not text.strip():
-            return {}
-            
-        invoice = {}
-        invoice['Tồn tại hóa đơn'] = "Tồn tại hóa đơn" in text
-        
-        patterns = {
-            'Trạng thái xử lý hoá đơn': r"Trạng thái xử lý hoá đơn: (.+)",
-            'Trạng thái hóa đơn': r"Trạng thái hóa đơn: (.+)",
-            'Thay thế cho hóa đơn': r"Thay thế cho hóa đơn (.+)"
-        }
-        
-        for key, pattern in patterns.items():
-            if match := re.search(pattern, text):
-                invoice[key] = match.group(1).strip()
-                
-        return invoice
+
     
     def process_invoices(self, excel_path: str) -> pd.DataFrame:
         """Process all invoices from Excel file."""
@@ -309,7 +346,7 @@ class InvoiceChecker:
                 dtype={'MST': str} 
             )
            
-            
+            re = []
             # Process each row
             for idx, row in df.iterrows():
                 result = self.process_invoice_row(row)
@@ -317,12 +354,10 @@ class InvoiceChecker:
                 if 'error' in result:
                     df.loc[idx, 'noidung'] = f"Error: {result['error']}"
                 else:
-                    df.loc[idx, 'noidung'] = result['result']
-                    for key, value in result['analysis'].items():
-                        df.loc[idx, key] = value
+                    re.append(result['result'])                
                     df.loc[idx, 'screenshot'] = result['screenshot']
-            
-            return df
+            logging.info(re)
+            return pd.concat(re, ignore_index=True, sort=False)
             
         finally:
             if self.browser:
@@ -333,7 +368,7 @@ class InvoiceChecker:
         timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
         report_dir = Path(self.path) / 'reports'
         report_dir.mkdir(exist_ok=True)
-        
+        df.to_excel(report_dir / f'report_{timestamp}.xlsx', index=False)
         return report_dir
     
     def run(self,filename = "template.xlsx") -> None:
