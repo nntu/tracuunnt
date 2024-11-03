@@ -192,21 +192,13 @@ class InvoiceChecker:
              
             
             # Handle captcha and get result
-            self._handle_captcha()
-            
-            time.sleep(2)
-            
-             
-             
+            self._handle_captcha()            
+            time.sleep(2)   
             result = self._wait_for_result()
-             
-            
-            
-            
             time.sleep(5)
             # Take screenshot
             screenshot_path = self._take_screenshot(mst)
-            
+           
             return {
                 'result': result,                
                 'screenshot': screenshot_path
@@ -280,14 +272,17 @@ class InvoiceChecker:
                     logging.info(result_element.text)
                     if result_element.text == "Vui lòng nhập đúng mã xác nhận!":
                         attempt += 1
-                        capcha_diff = capcha_dir / "capcha_diff" 
+                        capcha_diff = capcha_dir / "capcha_error" 
                         capcha_diff.mkdir(parents=True, exist_ok=True)     
                         
-                        os.replace(capfile,capcha_diff / f"captcha_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")                              
+                        os.replace(capfile,capcha_diff / f"{solved_captcha}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")                              
                         continue
                     else:
                         return False
                 except TimeoutException as e:
+                    capcha_ok = capcha_dir / "capcha_ok" 
+                    capcha_ok.mkdir(parents=True, exist_ok=True)
+                    os.replace(capfile,capcha_ok / f"{solved_captcha}.png") 
                     logging.info("solve captcha")
                     break
             

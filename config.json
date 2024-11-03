@@ -1,5 +1,5 @@
 {
-  "headless": "False",
+  "headless": "True",
   "use_proxy": "False",
   "proxy_username": " ",
   "proxy_password":" ",
