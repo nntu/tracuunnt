@@ -1,11 +1,13 @@
 
-import datetime
+from datetime import datetime
 from pathlib import Path
 from PIL import Image
  
 import ssl
 import urllib.request
 from io import BytesIO
+
+from check_re import CaptchaPredictor
  
 
 
@@ -20,11 +22,19 @@ def downloadCaptcha(tempdir,url):
         im = Image.open(BytesIO(image_content))
         new_image = Image.new("RGBA", im.size, "WHITE") # Create a white rgba background
         new_image.paste(im, (0, 0), im)              # Paste the image on the background. Go to the links given below for details.
-        captchar =  f"{tempdir}/captcha_{datetime.now().strftime("%Y-%m-%d_%I-%M-%S_%p")}.jpg"
+        timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
+        captchar =  f"{tempdir}/captcha_{timestamp}.jpg"
         
         
         new_image.convert('RGB').save(captchar, "JPEG")  # Save as JPEG
-    return captchar
+        # Initialize the predictor
+        predictor = CaptchaPredictor('captcha.keras')
+
+        # Single image prediction
+        text = predictor.predict(captchar)
+                
+        
+    return text
     
 # im = Image.open("Ba_b_do8mag_c6_big.png")
 # rgb_im = im.convert('RGB')

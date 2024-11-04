@@ -275,7 +275,7 @@ class InvoiceChecker:
                         capcha_diff = capcha_dir / "capcha_error" 
                         capcha_diff.mkdir(parents=True, exist_ok=True)     
                         
-                        os.replace(capfile,capcha_diff / f"{solved_captcha}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png")                              
+                        os.replace(capfile,capcha_diff / f'{solved_captcha}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png')                              
                         continue
                     else:
                         return False
