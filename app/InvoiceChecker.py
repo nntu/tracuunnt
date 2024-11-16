@@ -3,7 +3,7 @@ import io
 import json
 import logging
 import os
-from datetime import datetime, date
+from datetime import datetime
 from pathlib import Path
 from Screenshot import Screenshot
 import pandas as pd
@@ -15,21 +15,18 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, StaleElementReferenceException
-from typing import Dict
-import base64
-import re
+from typing import Any, Dict, List
 import time
- 
+from datetime import date, datetime
  
 from PIL import Image
-import urllib
 
-from app.utils.downloadCaptcha import downloadCaptcha
+from app.DocxReportGenerator import DocxReportGenerator  # Import the class directly
 from check_re import CaptchaPredictor
 class InvoiceChecker:
     """Optimized system for checking and processing invoices."""
     
-    def __init__(self, path: str, data_dir: str, config: dict):
+    def __init__(self, path: str, data_dir: str, config: dict,signal_handler=None):
         self.path = path
         self.data_dir = data_dir
         self.config = config
@@ -37,22 +34,52 @@ class InvoiceChecker:
         self.max_retries = 3
         self.browser = None
         self.predictor = CaptchaPredictor('captcha.keras')
+        self.signal_handler = signal_handler
         # Configure logging
         self._setup_logging()
     
-    def _setup_logging(self) -> None:
+    def _setup_logging(self, level: int = logging.INFO) -> None:
         """Configure logging with proper format and file handling."""
         log_dir = Path(self.path) / 'logs'
         log_dir.mkdir(exist_ok=True)
         
         log_file = log_dir / f'log_{datetime.now().strftime("%Y_%m_%d")}.log'
-        logging.basicConfig(
-            filename=log_file,
-            format='%(levelname)s | %(asctime)s | %(message)s',
-            datefmt='%m/%d/%Y %I:%M:%S %p',
-            level=logging.INFO,
-            encoding="utf-8"
+        
+        # Create a custom formatter
+        formatter = logging.Formatter('%(levelname)s | %(asctime)s | %(message)s', 
+                                    datefmt='%m/%d/%Y %I:%M:%S %p')
+        
+        # File handler
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler.setFormatter(formatter)
+        
+        # Get the root logger
+        logger = logging.getLogger()
+        logger.setLevel(level)
+            # Also log to console
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(
+            logging.Formatter('%(levelname)s: %(message)s')
         )
+        # Remove existing handlers to avoid duplicates
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            
+        # Add the file handler
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+        # Add signal handler if provided
+        if self.signal_handler:
+            signal_handler = logging.StreamHandler(self.signal_handler)
+            signal_handler.setFormatter(formatter)
+            logger.addHandler(signal_handler)
+
+    def log_info(self, message):
+        """Helper method to log info messages"""
+        logging.info(message)
+        if self.signal_handler:
+            self.signal_handler.emit(f"INFO | {datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')} | {message}")
     
     def _init_chrome_options(self) -> Options:
         """Initialize Chrome options with optimal settings."""
@@ -180,11 +207,11 @@ class InvoiceChecker:
         
         return driver
     
-    def process_invoice_row(self, row: pd.Series) -> Dict:
+    def process_invoice_row(self, mst: str) -> Dict:
         """Process a single invoice row."""
         try:
             # Prepare invoice data
-            mst = row['MST']
+            
             
             
             # Fill form fields
@@ -205,7 +232,7 @@ class InvoiceChecker:
             }
             
         except Exception as e:
-            logging.error(f"Error processing invoice {row['MST']}: {str(e)}")
+            logging.error(f"Error processing invoice {mst}: {str(e)}")
             return {'error': str(e)}
     
     def _fill_form_safely(self, element_id: str, value: str, clear_first: bool = True) -> None:
@@ -249,7 +276,7 @@ class InvoiceChecker:
                  
                 logging.info(capfile)
                 solved_captcha = self.predictor.predict(capfile)
-                print(f"Predicted text: {solved_captcha}")
+                logging.info(f"Predicted text: {solved_captcha}")
                 
                 
                 
@@ -325,57 +352,89 @@ class InvoiceChecker:
     
 
     
-    def process_invoices(self, excel_path: str) -> pd.DataFrame:
-        """Process all invoices from Excel file."""
+    def process_invoices(self, mst_list: List[str]) -> Dict[str, Any]:
+        """Process a list of MST strings."""
         try:
             # Initialize browser
             self.browser = self.init_driver()
             self.browser.get('https://tracuunnt.gdt.gov.vn/tcnnt/mstdn.jsp')
             time.sleep(5)
-            # Handle initial popup if present
             
-            
-            # Read and process Excel file
-            df = pd.read_excel(
-                excel_path,
-                dtype={'MST': str} 
-            )
-           
             re = []
-            # Process each row
-            for idx, row in df.iterrows():
-                result = self.process_invoice_row(row)
-                
-                if 'error' in result:
-                    df.loc[idx, 'noidung'] = f"Error: {result['error']}"
-                else:
-                    re.append(result['result'])                
-                    df.loc[idx, 'screenshot'] = result['screenshot']
-            logging.info(re)
-            return pd.concat(re, ignore_index=True, sort=False)
+            screenshots = {}  # Dictionary to store screenshot paths
+            total = len(mst_list)
             
+            # Process each MST
+            for idx, mst in enumerate(mst_list, 1):
+                try:
+                    # Create a Series to match the expected input format
+                     
+                    result = self.process_invoice_row(mst)
+                    
+                    if 'error' in result:
+                        logging.error(f"Error processing MST {mst}: {result['error']}")
+                    else:
+                        re.append(result['result'])
+                        if 'screenshot' in result:
+                            screenshots[mst] = result['screenshot']
+                            
+                    logging.info(f"Processed {idx}/{total} MSTs")
+                    
+                except Exception as e:
+                    logging.error(f"Failed to process MST {mst}: {str(e)}")
+            
+            # Combine results
+            result_df = pd.concat(re, ignore_index=True, sort=False) if re else pd.DataFrame()
+            
+            # Add MST column if not present
+            if 'MST' not in result_df.columns:
+                result_df['MST'] = mst_list[:len(result_df)]
+            
+            return {
+                'result_df': result_df,
+                'screenshots': screenshots
+            }
+                
         finally:
             if self.browser:
                 self.browser.quit()
     
-    def create_report(self, df: pd.DataFrame ) -> Path:
-        """Create Excel and Word reports from processed data."""
-        timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
-        report_dir = Path(self.path) / 'reports'
-        report_dir.mkdir(exist_ok=True)
-        df.to_excel(report_dir / f'report_{timestamp}.xlsx', index=False)
-        return report_dir
+     
     
-    def run(self,filename = "template.xlsx") -> None:
+    def create_docx_report(self, df: pd.DataFrame) -> Path:
+        """Create Word document report with screenshots"""
+        try:
+            # Create report directory
+            timestamp = datetime.now().strftime('%d%m%Y_%H%M%S')
+            report_dir = Path(self.path) / 'reports' / timestamp
+            report_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Initialize DocxReportGenerator
+            docx_generator = DocxReportGenerator(report_dir)
+            
+            # Generate Word document
+            doc_path = docx_generator.create_docx_report(
+                result_data=df,
+               
+                title="Invoice Check Report"
+            )
+            df.to_excel(report_dir / f'report_{timestamp}.xlsx', index=False)
+            
+        
+        except Exception as e:
+            logging.error(f"Failed to create Word report: {str(e)}")
+            raise
+        
+    
+    
+    def run(self,list_mst: List[str]) -> None:
         """Main execution method."""
         try:
-            template_path = Path(filename)  
-            if not template_path.exists():
-                raise FileNotFoundError("Template Excel file not found")
+             
             
             # Process invoices and generate reports
-            df = self.process_invoices(str(template_path))
-            self.create_report(df)
+            df = self.process_invoices(list_mst)
+            self.create_docx_report(df)
             
             logging.info("Invoice processing completed successfully")
             

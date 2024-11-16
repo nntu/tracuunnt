@@ -21,12 +21,14 @@ def main():
         
         setup_logging(Path(path) /"logs")
         # Create data directory
-        data_dir = Path(path) / 'data' / current_date.strftime('%d_%m_%Y')
+        data_dir = Path(path) / 'reports' / current_date.strftime('%d_%m_%Y')
         data_dir.mkdir(parents=True, exist_ok=True)
         
         # Initialize and run invoice checker
         checker = InvoiceChecker(path, str(data_dir), config)
-        checker.run()
+        list_mst = {'0100150619-041','0100150619-052'}
+        
+        checker.run(list_mst)
         
     except Exception as e:
         logging.error(f"Critical error in main: {str(e)}")
