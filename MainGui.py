@@ -1,3 +1,4 @@
+# -*- coding: utf8 -*-
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QLineEdit, QLabel, 
                             QTableWidget, QTableWidgetItem, QProgressBar, 
@@ -10,98 +11,95 @@ import sys
 import json
 import logging
 import os
-
 from pathlib import Path
 import pandas as pd
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 import threading
 from queue import Queue
 from datetime import date, datetime
 
-
 class EnhancedReportDialog(QDialog):
-        """Enhanced dialog for handling multiple report formats"""
-        def __init__(self, excel_path: Path, docx_path: Optional[Path], 
-                    report_dir: Path, parent=None):
-            super().__init__(parent)
-            self.excel_path = excel_path
-            self.docx_path = docx_path
-            self.report_dir = report_dir
-            self.setup_ui()
+    """Enhanced dialog for handling multiple report formats"""
+    def __init__(self, excel_path: Union[str, Path], docx_path: Optional[Union[str, Path]], 
+                report_dir: Union[str, Path], parent=None):
+        super().__init__(parent)
+        self.excel_path = Path(excel_path) if excel_path else None
+        self.docx_path = Path(docx_path) if docx_path else None
+        self.report_dir = Path(report_dir)
+        self.setup_ui()
 
-        def setup_ui(self):
-            self.setWindowTitle("Reports Generated")
-            self.setMinimumWidth(500)
-            
-            layout = QVBoxLayout(self)
-            
-            # Report directory info
-            dir_label = QLabel("Reports saved to:")
-            dir_path = QLabel(str(self.report_dir))
-            dir_path.setWordWrap(True)
-            dir_path.setStyleSheet("font-weight: bold;")
-            
-            layout.addWidget(dir_label)
-            layout.addWidget(dir_path)
-            layout.addSpacing(10)
-            
-            # Available reports section
-            reports_group = QWidget()
-            reports_layout = QVBoxLayout(reports_group)
-            
-            # Excel report
-            if self.excel_path and self.excel_path.exists():
-                excel_btn = QPushButton("Open Excel Report")
-                excel_btn.clicked.connect(lambda: self.open_file(self.excel_path))
-                reports_layout.addWidget(excel_btn)
-            
-            # Word report
-            if self.docx_path and self.docx_path.exists():
-                word_btn = QPushButton("Open Word Report")
-                word_btn.clicked.connect(lambda: self.open_file(self.docx_path))
-                reports_layout.addWidget(word_btn)
-            
-            layout.addWidget(reports_group)
-            layout.addSpacing(10)
-            
-            # Bottom buttons
-            button_layout = QHBoxLayout()
-            
-            open_folder_btn = QPushButton("Open Reports Folder")
-            open_folder_btn.clicked.connect(self.open_folder)
-            
-            close_btn = QPushButton("Close")
-            close_btn.clicked.connect(self.accept)
-            
-            button_layout.addWidget(open_folder_btn)
-            button_layout.addWidget(close_btn)
-            
-            layout.addLayout(button_layout)
+    def setup_ui(self):
+        self.setWindowTitle("Reports Generated")
+        self.setMinimumWidth(500)
+        
+        layout = QVBoxLayout(self)
+        
+        # Report directory info
+        dir_label = QLabel("Reports saved to:")
+        dir_path = QLabel(str(self.report_dir))
+        dir_path.setWordWrap(True)
+        dir_path.setStyleSheet("font-weight: bold;")
+        
+        layout.addWidget(dir_label)
+        layout.addWidget(dir_path)
+        layout.addSpacing(10)
+        
+        # Available reports section
+        reports_group = QWidget()
+        reports_layout = QVBoxLayout(reports_group)
+        
+        # Excel report
+        if self.excel_path and self.excel_path.exists():
+            excel_btn = QPushButton("Open Excel Report")
+            excel_btn.clicked.connect(lambda: self.open_file(self.excel_path))
+            reports_layout.addWidget(excel_btn)
+        
+        # Word report
+        if self.docx_path and self.docx_path.exists():
+            word_btn = QPushButton("Open Word Report")
+            word_btn.clicked.connect(lambda: self.open_file(self.docx_path))
+            reports_layout.addWidget(word_btn)
+        
+        layout.addWidget(reports_group)
+        layout.addSpacing(10)
+        
+        # Bottom buttons
+        button_layout = QHBoxLayout()
+        
+        open_folder_btn = QPushButton("Open Reports Folder")
+        open_folder_btn.clicked.connect(self.open_folder)
+        
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        
+        button_layout.addWidget(open_folder_btn)
+        button_layout.addWidget(close_btn)
+        
+        layout.addLayout(button_layout)
 
-        def open_folder(self):
-            """Open folder containing the reports"""
-            try:
-                if sys.platform == 'win32':
-                    os.startfile(self.report_dir)
-                elif sys.platform == 'darwin':  # macOS
-                    subprocess.run(['open', str(self.report_dir)])
-                else:  # linux
-                    subprocess.run(['xdg-open', str(self.report_dir)])
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to open folder: {str(e)}")
+    def open_folder(self):
+        """Open folder containing the reports"""
+        try:
+            if sys.platform == 'win32':
+                os.startfile(self.report_dir)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.run(['open', str(self.report_dir)])
+            else:  # linux
+                subprocess.run(['xdg-open', str(self.report_dir)])
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to open folder: {str(e)}")
 
-        def open_file(self, file_path: Path):
-            """Open a specific report file"""
-            try:
-                if sys.platform == 'win32':
-                    os.startfile(file_path)
-                elif sys.platform == 'darwin':  # macOS
-                    subprocess.run(['open', str(file_path)])
-                else:  # linux
-                    subprocess.run(['xdg-open', str(file_path)])
-            except Exception as e:
-                QMessageBox.warning(self, "Error", f"Failed to open file: {str(e)}")   
-
+    def open_file(self, file_path: Path):
+        """Open a specific report file"""
+        try:
+            if sys.platform == 'win32':
+                os.startfile(file_path)
+            elif sys.platform == 'darwin':  # macOS
+                subprocess.run(['open', str(file_path)])
+            else:  # linux
+                subprocess.run(['xdg-open', str(file_path)])
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to open file: {str(e)}")   
 
 class SignalHandler:
     """Handler to bridge logging to GUI signals"""
@@ -192,14 +190,14 @@ class InvoiceProcessThread(QThread):
     """Worker thread for processing invoices"""
     progress = pyqtSignal(int)
     status = pyqtSignal(str)
-    finished = pyqtSignal(pd.DataFrame)
+    finished = pyqtSignal(dict)  # Changed to emit dict instead of DataFrame
     error = pyqtSignal(str)
     log = pyqtSignal(str)
 
-    def __init__(self, mst_list: List[str], path: str, config: Dict[str, Any]):
+    def __init__(self, mst_list: List[str], path: Union[str, Path], config: Dict[str, Any]):
         super().__init__()
         self.mst_list = mst_list
-        self.path = path
+        self.path = Path(path)
         self.config = config
         self.signal_handler = SignalHandler(self.log)
         
@@ -218,36 +216,25 @@ class InvoiceProcessThread(QThread):
         try:
             from app.InvoiceChecker import InvoiceChecker
             
-            # Create temporary Excel file
+            # Create data directory with current date
             current_date = date.today()
-            data_dir = Path(self.path) / 'data' / current_date.strftime('%d_%m_%Y')
+            data_dir = self.path.joinpath('reports', current_date.strftime('%d_%m_%Y'))
             data_dir.mkdir(parents=True, exist_ok=True)
             
-            temp_excel = data_dir / 'temp_input.xlsx'
-            df = pd.DataFrame({'MST': self.mst_list})
-            df.to_excel(temp_excel, index=False)
-            
-            self.logger.info(f"Created temporary Excel file at {temp_excel}")
-
             # Initialize checker with logger
             checker = InvoiceChecker(
                 self.path, 
-                str(data_dir), 
+                data_dir, 
                 self.config,
                 self.signal_handler
             )
             
             # Process invoices
             self.logger.info("Starting invoice processing...")
-            result_df = checker.process_invoices(str(temp_excel))
+            results = checker.process_invoices(self.mst_list)  # Now expects list of MSTs directly
             self.logger.info("Invoice processing completed")
             
-            # Cleanup
-            if temp_excel.exists():
-                temp_excel.unlink()
-                self.logger.info("Cleaned up temporary files")
-                
-            self.finished.emit(result_df)
+            self.finished.emit(results)
             
         except Exception as e:
             self.logger.error(f"Error occurred: {str(e)}")
@@ -263,7 +250,7 @@ class ReportDialog(QDialog):
     """Dialog showing report details with open folder option"""
     def __init__(self, report_path: Path, parent=None):
         super().__init__(parent)
-        self.report_path = report_path
+        self.report_path = Path(report_path)
         self.setup_ui()
 
     def setup_ui(self):
@@ -326,10 +313,10 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1000, 800)
         
         # Initialize variables
-        self.path = os.getcwd()
+        self.path = Path(os.getcwd())
         self.mst_list: List[str] = []
         self.screenshots: Dict[str, str] = {}
-        self.report_manager = ReportManager(Path(self.path))
+        self.report_manager = ReportManager(self.path)
         self.setup_config()
         
         # Create main widget and layout
@@ -370,7 +357,7 @@ class MainWindow(QMainWindow):
 
     def setup_config(self):
         """Load configuration from config.json"""
-        config_path = Path(self.path) / 'config.json'
+        config_path = self.path.joinpath('config.json')
         try:
             with open(config_path, 'r', encoding='UTF-8') as f:
                 self.config = json.load(f)
@@ -671,33 +658,23 @@ class MainWindow(QMainWindow):
         self.status_label.setText(message)
         self.statusBar().showMessage(message)
 
-    def processing_finished(self, result_df: pd.DataFrame):
+    def processing_finished(self, results: Dict[str, Any]):
         """Handle processing completion with Excel and Word reports"""
         try:
-            # Ensure result_df is a DataFrame
-            if not isinstance(result_df, pd.DataFrame):
-                raise ValueError("Invalid result format received")
+            # Extract results from the dictionary
+            result_df = results.get('result_df', pd.DataFrame())
+            screenshots = results.get('screenshots', {})
             
-            # Add status column if not present
-            if 'status' not in result_df.columns:
-                result_df['status'] = 'Completed'
+            if result_df.empty:
+                raise ValueError("No results received from processing")
             
-            # Get screenshots dictionary from the DataFrame
-            screenshots = {}
-            if 'screenshot' in result_df.columns:
-                screenshots = {
-                    str(row['MST']): str(row['screenshot'])
-                    for _, row in result_df.iterrows()
-                    if pd.notna(row.get('screenshot'))
-                }
-            
-            # Create timestamp directory for all reports
+            # Create timestamp directory for reports
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_dir = Path(self.path) / 'reports' / timestamp
+            report_dir = self.path.joinpath('reports', timestamp)
             report_dir.mkdir(parents=True, exist_ok=True)
             
             # Save Excel report
-            excel_path = report_dir / f'report_{timestamp}.xlsx'
+            excel_path = report_dir.joinpath(f'report_{timestamp}.xlsx')
             result_df.to_excel(excel_path, index=False)
             
             # Initialize DocxReportGenerator and create Word report
@@ -705,6 +682,7 @@ class MainWindow(QMainWindow):
             docx_generator = DocxReportGenerator(report_dir)
             
             try:
+                # Pass result_df and screenshots separately
                 docx_path = docx_generator.create_docx_report(
                     result_df=result_df,
                     screenshots=screenshots,
@@ -719,14 +697,9 @@ class MainWindow(QMainWindow):
             self.progress_bar.setValue(self.progress_bar.maximum())
             self.statusBar().showMessage("Processing completed successfully")
             
-            # Log the results summary
+            # Log results summary
             self.append_log(f"Processing completed. Total records: {len(result_df)}")
             self.append_log(f"Reports directory: {report_dir}")
-            
-            if 'status' in result_df.columns:
-                status_counts = result_df['status'].value_counts()
-                for status, count in status_counts.items():
-                    self.append_log(f"{status}: {count}")
             
             # Show enhanced report dialog
             dialog = EnhancedReportDialog(excel_path, docx_path, report_dir, self)
@@ -737,7 +710,6 @@ class MainWindow(QMainWindow):
             logging.error(error_msg)
             self.processing_error(error_msg)
             
-         
     def update_screenshots(self, mst: str, screenshot_path: str):
         """Update screenshots dictionary"""
         if screenshot_path and Path(screenshot_path).exists():
