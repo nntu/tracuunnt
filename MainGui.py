@@ -17,7 +17,44 @@ from typing import Optional, List, Dict, Any, Union
 import threading
 from queue import Queue
 from datetime import date, datetime
+from PyQt6.QtGui import QAction , QIcon,QPixmap
 
+
+class AboutDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("About")
+        self.setFixedSize(568, 700)
+        
+        # Create layout
+        layout = QVBoxLayout()
+        
+        # Add logo/image
+        logo_label = QLabel()
+        # Replace 'logo.png' with your image path
+        pixmap = QPixmap('tkbidv.png')
+        scaled_pixmap = pixmap.scaled(345, 617, Qt.AspectRatioMode.KeepAspectRatio, 
+                                    Qt.TransformationMode.SmoothTransformation)
+        logo_label.setPixmap(scaled_pixmap)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Add text information
+        info_label = QLabel(
+            """<h2>Kiểm tra Thông Tin hóa đơn</h2>
+        <p>Version 1.1</p> 
+        <p>Copyright (C) 2024 by Nguyen Ngoc Tu</p>                
+        <p>Email: ngoctuct@gmail.com</p>"""
+        )
+        info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        info_label.setTextFormat(Qt.TextFormat.RichText)
+        
+        # Add widgets to layout
+       
+        layout.addWidget(info_label)
+        layout.addWidget(logo_label)
+        layout.addStretch()
+        
+        self.setLayout(layout)    
 class EnhancedReportDialog(QDialog):
     """Enhanced dialog for handling multiple report formats"""
     def __init__(self, excel_path: Union[str, Path], docx_path: Optional[Union[str, Path]], 
@@ -723,14 +760,9 @@ class MainWindow(QMainWindow):
         QMessageBox.critical(self, "Error", f"Processing failed: {error_message}")
 
     def show_about(self):
-        """Show about dialog"""
-        QMessageBox.about(
-            self,
-            "About Invoice Checker",
-            "Invoice Checker v1.0\n\n"
-            "A tool for checking and processing invoice information.\n\n"
-            "© 2024 Your Company Name"
-        )
+        dialog = AboutDialog(self)
+        dialog.exec()   
+         
 
     @staticmethod
     def open_file(file_path: Path):
