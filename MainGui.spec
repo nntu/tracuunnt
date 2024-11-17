@@ -44,6 +44,7 @@ coll = COLLECT(
     name='MainGui',
 )
 shutil.copyfile('config.json', '{0}/MainGui/config.json'.format(DISTPATH))
+shutil.copyfile('tkbidv.png', '{0}/MainGui/tkbidv.png'.format(DISTPATH))
 shutil.copyfile('captcha.keras', '{0}/MainGui/captcha.keras'.format(DISTPATH))
 shutil.copyfile('template.xlsx', '{0}/MainGui/template.xlsx'.format(DISTPATH))
 shutil.copytree('bin', '{0}/MainGui/bin'.format(DISTPATH), dirs_exist_ok=True)  # Fine

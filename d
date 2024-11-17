@@ -1,11 +1,13 @@
 # -*- coding: utf8 -*-
 from __future__ import annotations
 import io
+import json
 import logging
 import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from contextlib import contextmanager
 
 import pandas as pd
 from PIL import Image
@@ -15,11 +17,12 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import (
     TimeoutException, 
-    StaleElementReferenceException
+    StaleElementReferenceException,
+    WebDriverException
 )
 
 from app.DocxReportGenerator import DocxReportGenerator
-from app.ChromeDriverManager import ChromeDriverManager
+from app.driver_manager import ChromeDriverManager
 from check_re import CaptchaPredictor
 
 class InvoiceChecker:
@@ -277,7 +280,7 @@ class InvoiceChecker:
             logging.info(f"DataFrame columns: {df.columns}")
             logging.info(f"DataFrame head:\n{df.head()}")
             return docx_generator.create_docx_report(
-                df,
+                result_data=df,
                 title="Invoice Check Report"
             )
         except Exception as e:

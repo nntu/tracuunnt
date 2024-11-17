@@ -1,5 +1,6 @@
 {
     "python.analysis.extraPaths": [
         "./app"
-    ]
+    ],
+    "CodeGPT.apiKey": "CodeGPT Plus Beta"
 }
