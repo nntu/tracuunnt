@@ -213,6 +213,13 @@ class ChromeDriverManager:
 
         return False
 
+    def execute_script( self, script: Any, *args: Any):
+        try:
+            return self.driver.execute_script(script)
+        except TimeoutException as e:
+            logging.error(e)
+            
+
     def wait_for_element(
         self, 
         by: By, 

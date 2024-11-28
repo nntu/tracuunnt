@@ -48,45 +48,8 @@ class InvoiceChecker:
             path=self.path,
             download_dir=self.data_dir
         )
-        self._setup_logging()
-
-    def _setup_logging(self, level: int = logging.INFO) -> None:
-        """Configure logging with proper format and file handling."""
-        log_dir = self.path.joinpath('logs')
-        log_dir.mkdir(exist_ok=True)
-        
-        log_file = log_dir.joinpath(f'log_{datetime.now().strftime("%Y_%m_%d")}.log')
-        formatter = logging.Formatter(
-            '%(levelname)s | %(asctime)s | %(message)s',
-            datefmt='%m/%d/%Y %I:%M:%S %p'
-        )
-        
-        logger = logging.getLogger()
-        logger.setLevel(level)
-        
-        # Remove existing handlers
-        for handler in logger.handlers[:]:
-            logger.removeHandler(handler)
-        
-        # Add handlers with proper formatting
-        handlers = [
-            logging.FileHandler(str(log_file), encoding="utf-8"),
-            logging.StreamHandler()
-        ]
-        
-        if self.signal_handler:
-            handlers.append(logging.StreamHandler(self.signal_handler))
-        
-        for handler in handlers:
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-
-    def log_info(self, message: str) -> None:
-        """Helper method to log info messages with signal handling."""
-        logging.info(message)
-        if self.signal_handler:
-            timestamp = datetime.now().strftime('%m/%d/%Y %I:%M:%S %p')
-            self.signal_handler.emit(f"INFO | {timestamp} | {message}")
+    
+    
 
     def _wait_for_element(
         self, 
@@ -105,7 +68,33 @@ class InvoiceChecker:
             self._handle_captcha()
             
             # Wait for and get result
-            result = self._wait_for_result()
+            """Wait for and parse result table."""
+        
+            result_element = self._wait_for_element(
+                By.CLASS_NAME, 
+                "ta_border",
+                timeout=5
+            )
+            result_html = result_element.get_attribute("outerHTML")
+            
+            if "<table class" in result_html:
+                df = pd.read_html(io.StringIO(result_html))[0]
+              
+                post_scr = """
+                var table_html = ''
+                $.post('tcnnt/nganhkinhdoanh.jsp', {tin: %s}, function(result){
+                    table_html = result;
+                });
+                return table_html
+                """ % (mst)                
+                
+                nganhnghe = self.driver_manager.execute_script(post_scr)
+                
+                logging.info(nganhnghe)
+                 
+                result =  df.iloc[:-1, :]  # Remove last row
+                
+        
             
             # Take screenshot
             screenshot_path = self._take_screenshot(mst)
@@ -195,24 +184,7 @@ class InvoiceChecker:
         new_path = capcha_ok.joinpath(f"{solved_captcha}.png")
         os.replace(capfile, str(new_path))
 
-    def _wait_for_result(self) -> pd.DataFrame:
-        """Wait for and parse result table."""
-        try:
-            result_element = self._wait_for_element(
-                By.CLASS_NAME, 
-                "ta_border",
-                timeout=5
-            )
-            result_html = result_element.get_attribute("outerHTML")
-            
-            if "<table class" in result_html:
-                df = pd.read_html(io.StringIO(result_html))[0]
-                return df.iloc[:-1, :]  # Remove last row
-                
-        except TimeoutException as e:
-            raise TimeoutException("Timeout waiting for result table") from e
-        except Exception as e:
-            raise Exception(f"Error parsing result table: {str(e)}") from e
+ 
 
     def _take_screenshot(self, mst: str) -> str:
         """Take and save full page screenshot."""
@@ -251,7 +223,7 @@ class InvoiceChecker:
                         results.append(result['result'])
                         screenshots[mst] = result['screenshot']
                         
-                    self.log_info(f"Processed {idx}/{total} MSTs")
+                    logging.info(f"Processed {idx}/{total} MSTs")
                     
                 except Exception as e:
                     logging.error(f"Failed to process MST {mst}: {str(e)}")
@@ -289,7 +261,7 @@ class InvoiceChecker:
         try:
             results = self.process_invoices(list_mst)
             self.create_docx_report(results['result_df'])
-            self.log_info("Invoice processing completed successfully")
+            logging.info("Invoice processing completed successfully")
             
         except Exception as e:
             logging.error(f"Error during execution: {str(e)}")

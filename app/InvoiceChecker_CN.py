@@ -46,38 +46,9 @@ class InvoiceChecker_CN:
         self.driver_manager = ChromeDriverManager( is_headless=config.get('headless', True), path=self.path,
             download_dir=self.data_dir
         )
-        self._setup_logging()
+        
 
-    def _setup_logging(self, level: int = logging.INFO) -> None:
-        """Configure logging with proper format and file handling."""
-        log_dir = self.path.joinpath('logs')
-        log_dir.mkdir(exist_ok=True)
-        
-        log_file = log_dir.joinpath(f'log_{datetime.now().strftime("%Y_%m_%d")}.log')
-        formatter = logging.Formatter(
-            '%(levelname)s | %(asctime)s | %(message)s',
-            datefmt='%m/%d/%Y %I:%M:%S %p'
-        )
-        
-        logger = logging.getLogger()
-        logger.setLevel(level)
-        
-        # Remove existing handlers
-        for handler in logger.handlers[:]:
-            logger.removeHandler(handler)
-        
-        # Add handlers with proper formatting
-        handlers = [
-            logging.FileHandler(str(log_file), encoding="utf-8"),
-            logging.StreamHandler()
-        ]
-        
-        if self.signal_handler:
-            handlers.append(logging.StreamHandler(self.signal_handler))
-        
-        for handler in handlers:
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
+    
 
      
 
