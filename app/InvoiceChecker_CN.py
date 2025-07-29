@@ -62,7 +62,26 @@ class InvoiceChecker_CN:
         """Wait for element with explicit wait and proper error handling."""
         return self.driver_manager.wait_for_element(by, value, timeout, condition)
 
-   
+    def process_invoice_row_mstcn(self, cccd: str) -> Dict:
+        """Process a single invoice row with improved error handling."""
+        try:
+            self._fill_form_safely('cmt2', cccd)
+            self._handle_captcha()
+            
+            # Wait for and get result
+            result = self._wait_for_result(cccd)
+            
+            # Take screenshot
+            screenshot_path = self._take_screenshot(cccd)
+            
+            return {
+                'result': result,
+                'screenshot': screenshot_path
+            }
+            
+        except Exception as e:
+            logging.error(f"Error processing invoice {cccd}: {str(e)}")
+            return {'error': str(e)}
     def process_invoice_row_cccd(self, cccd: str) -> Dict:
         """Process a single invoice row with improved error handling."""
         try:
@@ -260,7 +279,43 @@ class InvoiceChecker_CN:
             'screenshots': screenshots
         }
     
-    
+    def process_invoices_mstcn(self, cccd_list: List[str]) -> Dict[str, Any]:
+        """Process multiple MST numbers with improved error handling and reporting."""
+        results = []
+        screenshots = {}
+        total = len(cccd_list)
+        
+        with self.driver_manager as driver:
+            driver.get('https://tracuunnt.gdt.gov.vn/tcnnt/mstcn.jsp')
+            self._wait_for_element(By.NAME, 'cmt2')  # Wait for page load
+            
+            for idx, cccd in enumerate(cccd_list, 1):
+                try:
+                    result = self.process_invoice_row_cccd(cccd)
+                    
+                    if 'error' in result:
+                        logging.error(f"Error processing MST {cccd}: {result['error']}")
+                    else:
+                        results.append(result['result'])
+                        screenshots[cccd] = result['screenshot']
+                        
+                    logging.info(f"Processed {idx}/{total} MSTs")
+                    
+                except Exception as e:
+                    logging.error(f"Failed to process MST {cccd}: {str(e)}")
+        
+        # Combine results
+        result_df = pd.concat(results, ignore_index=True, sort=False) if results else pd.DataFrame()
+        logging.info(result_df)
+        # Add MST column if not present
+        if 'Số CMT/Thẻ căn cước' not in result_df.columns and not result_df.empty:
+            result_df['Số CMT/Thẻ căn cước'] = cccd_list[:len(result_df)]
+        
+        return {
+            'result_df': result_df,
+            'screenshots': screenshots
+        }
+        
     def process_invoices_cccd(self, cccd_list: List[str]) -> Dict[str, Any]:
         """Process multiple MST numbers with improved error handling and reporting."""
         results = []

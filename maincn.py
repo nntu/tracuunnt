@@ -38,6 +38,9 @@ def main():
  
         
         results = checker.process_invoices_cccd(list_mst)
+        print(results['result_df']) 
+        # Save results to Excel file
+        results['result_df'].to_excel(data_dir / 'results.xlsx', index=False)
         
         
         checker.create_docx_report(results['result_df'])
