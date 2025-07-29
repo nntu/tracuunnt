@@ -125,7 +125,7 @@ class InvoiceChecker:
 
     def _handle_captcha(self) -> None:
         """Handle captcha solving with improved retry logic and error handling."""
-        captcha_xpath = '//*[@id="tcmst"]/form/table/tbody/tr[6]/td[2]/table/tbody/tr/td[2]/div/img'
+        captcha_xpath = '/html/body/div/div[1]/div[4]/div[2]/div[2]/div/div/div[1]/form/table/tbody/tr[5]/td[2]/table/tbody/tr/td[2]/img'
         capcha_dir = self.path.joinpath("captcha")
         capcha_dir.mkdir(parents=True, exist_ok=True)
         

@@ -6,6 +6,7 @@ logs/*.log
 data/*
 captcha_images/*
 jpg/*
+
 ~$*.xlsx
 # Byte-compiled / optimized / DLL files
 __pycache__/
