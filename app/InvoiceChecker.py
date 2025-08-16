@@ -21,7 +21,8 @@ from selenium.common.exceptions import (
 from app.DocxReportGenerator import DocxReportGenerator
 from app.ChromeDriverManager import ChromeDriverManager
 from check_re import CaptchaPredictor
-
+import json
+import re
 class InvoiceChecker:
     """Optimized system for checking and processing invoices."""
     
@@ -69,28 +70,57 @@ class InvoiceChecker:
             
             # Wait for and get result
             """Wait for and parse result table."""
-        
+            driver = self.driver_manager.driver
+            html_source = driver.page_source
+            pattern = r"var\s+nntJson\s*=\s*(\{.*?\});"
+            match = re.search(pattern, html_source, re.DOTALL)
+
+            if match:
+                json_str = match.group(1)
+                print(json_str)
+                nnt_json = json.loads(json_str)
+                records = nnt_json.get("DATA", [])
+    
+                if records:
+                    # Create Excel writer for multi-sheet export
+                    with pd.ExcelWriter(f"nntJson_export_{mst}.xlsx", engine="xlsxwriter") as writer:
+                        # Main sheet
+                        main_df = pd.json_normalize(records)
+                        main_df.to_excel(writer, sheet_name="Main", index=False)
+
+                        # Nested lists to separate sheets
+                        for idx, rec in enumerate(records, start=1):
+                            for key, value in rec.items():
+                                if isinstance(value, list) and value and isinstance(value[0], dict):
+                                    df_nested = pd.json_normalize(value)
+                                    sheet_name = f"{idx}_{key[:25]}"
+                                    df_nested.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                    print(f"✅ JSON exported to nntJson_export_{mst}.xlsx")
+                else:
+                    print("⚠ No DATA field found in JSON")
+
             result_element = self._wait_for_element(
                 By.CLASS_NAME, 
                 "ta_border",
                 timeout=5
             )
             result_html = result_element.get_attribute("outerHTML")
-            
+            print(result_html)
             if "<table class" in result_html:
                 df = pd.read_html(io.StringIO(result_html))[0]
               
-                post_scr = """
-                var table_html = ''
-                $.post('tcnnt/nganhkinhdoanh.jsp', {tin: %s}, function(result){
-                    table_html = result;
-                });
-                return table_html
-                """ % (mst)                
+                # post_scr = """
+                # var table_html = ''
+                # $.post('tcnnt/nganhkinhdoanh.jsp', {tin: %s}, function(result){
+                #     table_html = result;
+                # });
+                # return table_html
+                # """ % (mst)                
                 
-                nganhnghe = self.driver_manager.execute_script(post_scr)
+                # nganhnghe = self.driver_manager.execute_script(post_scr)
                 
-                logging.info(nganhnghe)
+                # logging.info(nganhnghe)
                  
                 result =  df.iloc[:-1, :]  # Remove last row
                 
@@ -125,7 +155,7 @@ class InvoiceChecker:
 
     def _handle_captcha(self) -> None:
         """Handle captcha solving with improved retry logic and error handling."""
-        captcha_xpath = '/html/body/div/div[1]/div[4]/div[2]/div[2]/div/div/div[1]/form/table/tbody/tr[5]/td[2]/table/tbody/tr/td[2]/img'
+        captcha_xpath = '//*[@id="module3Content"]/div/div[1]/form/table/tbody/tr[5]/td[2]/table/tbody/tr/td[2]/img'
         capcha_dir = self.path.joinpath("captcha")
         capcha_dir.mkdir(parents=True, exist_ok=True)
         
@@ -154,7 +184,7 @@ class InvoiceChecker:
                 
                 # Check for error message
                 try:
-                    error_xpath = "/html/body/div/div[1]/div[4]/div[2]/div[2]/div/div/div/p"
+                    error_xpath = '//*[@id="module3Content"]/div[1]/p'
                     error_element = self._wait_for_element(By.XPATH, error_xpath, timeout=5)
                     
                     if error_element.text == "Vui lòng nhập đúng mã xác nhận!":
